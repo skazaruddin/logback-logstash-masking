@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<configuration debug="false" scan="true" scanPeriod="10 minutes">
+
+    <contextName>save-employee-ms</contextName>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <jsonGeneratorDecorator class="net.logstash.logback.mask.MaskingJsonGeneratorDecorator">
+
+                <!-- Path Masking, masks value of JSON field. Works when JSON object is logged using StructuredArguments e.g.
+                     logger.error("incoming request payload", StructuredArguments.kv("payload", request));
+
+                Note: This only masks the JSON value for lastName in "payload" JSON Object Field of log & not in Message/msg json field.
+                -->
+                <pathMask>
+                    <path>/payload/firstName</path>
+                    <path>/payload/lastName</path>
+                    <mask>[masked]</mask>
+                </pathMask>
+
+                <!--             Masking of values in Message/msg field of JSON log as well as JSON Node Object like "payload"
+
+                                 logger.error("incoming request payload", StructuredArguments.kv("payload", request));
+                                 AND
+                                 String msg = new ObjectMapper().writeValueAsString(request);
+                                 String log = "incoming request payload " + msg;
+                                 logger.info(log);
+
+                                 If the data somehow is logged in msg field as string in any format ,
+                                 we need to mask that out as well. e.g. We convert the object into json string and log the object,
+                                 which will get logged in "msg"/"Message" field. So we need to mask values of lastName,firstName, etc as
+                                 well in the msg string.
+
+                                 Also, Suppose we log stacktrace as String
+                                 and the stacktrace logs contain sensitive value patterns, then we need to mask them as well in msg string
+
+                                 For those scenarios, we will take help of ValueMaskers. For each json field in whole Logstash JSON
+                                 log format, each JSON field value will be passed to every value masker we configure. That means
+                                 that is the value of firstName json field logged in StructuredArguments will be passed to ValueMasker
+                                 as well as the complete string content of Message/msg field.
+
+                                 ValueMasker's also provide flexibility in masking,
+                                 Suppose, we don't want to full mask a fieldValue like which happens in <pathMask>, then we can configure
+                                 that field on <valueMask> which gives us options to customize masking by grouping based on regex,
+                                 allowing us customization like, the value of firstName field will be masked in a way that, everything
+                                 in between first and last letter is only masked. e.g.
+
+                                 <valueMask>
+                                    <value>(?&lt;=firstName&quot;:&quot;)([^&quot;])[^&quot;]*([^&quot;])(?=&quot;)</value>
+                                    <mask>$1****$2</mask>
+                                </valueMask>
+
+                                Suppose, we want to mask any JSON field value matching following pattern of email, we can use this
+                                for partial masking of email value in any field. i.e. on msg or a field name xyz/email, or anything. As
+                                in value masking we are searching whole log string based on string pattern not by json node path.
+
+                                Partial Value masking i.e instead of email=********) email=k****@e***
+
+                                <valueMask>
+                                    <value>(\w)\w*@(\w)\w*\.(\w)\w*</value>
+                                    <mask>$1****@$2****.$3****</mask>
+                                </valueMask>
+                                 -->
+                <!-- Partial Value masking i.e instead of email=********) email=k****@e***-->
+                <valueMask>
+                    <value>(\w)\w*@(\w)\w*\.(\w)\w*</value>
+                    <mask>$1****@$2****.$3****</mask>
+                </valueMask>
+                <valueMask>
+                    <value>(.*apikey=)(.{36})(.*)</value>
+                    <mask>$1***$3</mask>
+                </valueMask>
+                <!--JSON in Message String masked with Grouping, i.e. everything in between first and last character is masked-->
+                <valueMask>
+                    <value>(?&lt;=firstName&quot;:&quot;)([^&quot;])[^&quot;]*([^&quot;])(?=&quot;)</value>
+                    <mask>$1****$2</mask>
+                </valueMask>
+
+                <valueMask>
+                    <value>(.*Authorization=)(.{255})(.*)</value>
+                    <mask>$1***$3</mask>
+                </valueMask>
+
+                <value>(?&lt;=zipCode&quot;:&quot;)([^&quot;])[^&quot;]*([^&quot;])(?=&quot;)</value>
+                <value>(?&lt;=password&quot;:\s*&quot;)([^&quot;])[^&quot;]*([^&quot;])(?=&quot;)</value>
+
+                <!--                Masking of DTO's to String fields, format-->
+                <value>(?&lt;=firstName=)[^\s,]*(?=\s|,)</value>
+                <value>(?&lt;=department=)[^\s,]*(?=\s|,)</value>
+                <value>(?&lt;=position=)[^\s,]*(?=\s|,)</value>
+
+                <!--                <value>((?!000|666)[0-8][0-9]{2}-(?!00)[0-9]{2}-(?!0000)[0-9]{4})</value> &lt;!&ndash; SSN &ndash;&gt;-->
+                <!--                <value>\"(\w*(?i)card\w*)\"\s*:\s*\"([^\"]*)\"</value>&lt;!&ndash; Any property with the word card &ndash;&gt;-->
+                <!--                <value>\"(\w*(?i)address\w*)\"\s*:\s*\"([^\"]*)\"</value>-->
+                <!--                <value>\"(\w*(?i)email\w*)\"\s*:\s*\"([^\"]*)\"</value>-->
+                <!--                <value>\"(\w*(?i)password\w*)\"\s*:\s*\"([^\"]*)\"</value>-->
+                <!--                <value>\"(\w*(?i)token\w*)\"\s*:\s*\"([^\"]*)\"</value>-->
+                <!--                <value>\"(\w*(?i)phone\w*)\"\s*:\s*\"([^\"]*)\"</value>-->
+                <!--                <value>\"(\w*(?i)passport\w*)\"\s*:\s*\"([^\"]*)\"</value>-->
+                <!--                <value>\"(\w*(?i)expiryDate\w*)\"\s*:\s*\"([^\"]*)\"</value>-->
+                <!--                <value>\"(\w*(?i)cvv\w*)\"\s*:\s*\"([^\"]*)\"</value>-->
+                <!--                <value>\"(\w*(?i)security\w*)\"\s*:\s*\"([^\"]*)\"</value>-->
+                <!--                <value>\"(\w*(?i)txnFlow\w*)\"\s*:\s*\"([^\"]*)\"</value>-->
+                <!--                <value>\"(\w*(?i)cvc\w*)\"\s*:\s*\"([^\"]*)\"</value>-->
+                <!--                <value>\"(\w*(?i)cvv\w*)\"\s*:\s*\"([^\"]*)\"</value>-->
+                <!--                <value>\"(\w*(?i)firstName\w*)\"\s*:\s*\"([^\"]*)\"</value>-->
+                <!--                <value>\"(\w*(?i)lastName\w*)\"\s*:\s*\"([^\"]*)\"</value>-->
+                <!--                <value>(\d+\.\d+\.\d+\.\d+)</value> &lt;!&ndash; Ip address IPv4&ndash;&gt;-->
+                <!--                <value>(\w+@\w+\.\w+)</value> &lt;!&ndash; Email pattern &ndash;&gt;-->
+            </jsonGeneratorDecorator>
+            <providers>
+                <timestamp>
+                    <fieldName>Timestamp/UTC</fieldName>
+                    <timeZone>UTC</timeZone>
+                </timestamp>
+                <logLevel>
+                    <fieldName>Level</fieldName>
+                </logLevel>
+                <threadName>
+                    <fieldName>Thread</fieldName>
+                </threadName>
+                <contextName>
+                    <fieldName>ServiceName</fieldName>
+                </contextName>
+                <pattern>
+                    <!-- the pattern that defines what to include -->
+                    <pattern>
+                        {
+                        "ServiceVersion": "1.0.0",
+                        "ServiceHostName": "${hostname}",
+                        "PID": "${PID:-}"
+                        }
+                    </pattern>
+                </pattern>
+                <mdc/>
+                <arguments>
+                    <includeNonStructuredArguments>true</includeNonStructuredArguments>
+                </arguments>
+                <loggerName>
+                    <fieldName>Logger</fieldName>
+                </loggerName>
+                <callerData>
+                    <classFieldName>Class</classFieldName>
+                    <methodFieldName>Method</methodFieldName>
+                    <fileFieldName>File</fileFieldName>
+                    <lineFieldName>Line</lineFieldName>
+                </callerData>
+                <message>
+                    <fieldName>Message</fieldName>
+                </message>
+                <throwableClassName>
+                    <fieldName>ExceptionClass</fieldName>
+                </throwableClassName>
+                <stackTrace>
+                    <fieldName>StackTrace</fieldName>
+                    <!-- maxLength - limit the length of the stack trace -->
+                    <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                        <maxDepthPerThrowable>200</maxDepthPerThrowable>
+                        <maxLength>5000</maxLength>
+                        <rootCauseFirst>true</rootCauseFirst>
+                    </throwableConverter>
+                </stackTrace>
+            </providers>
+        </encoder>
+    </appender>
+    <root level="info">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>
